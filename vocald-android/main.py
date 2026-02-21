@@ -551,8 +551,10 @@ class LogsScreen(Screen):
         status = rec.get('processed', 0)
         badge_text = ['⏳ Pending', '✅ Done', '❌ Failed'][status]
         badge_color = [WARN_HEX, ACCENT_HEX, DANGER_HEX][status]
-        top.add_widget(make_label(badge_text, size=11, bold=True,
-                                  color=badge_color))
+        _lbl1 = make_label(badge_text, size=11, bold=True, color=badge_color)
+        _lbl1.size_hint_x = None
+        _lbl1.width = dp(80)
+        top.add_widget(_lbl1)
         card.add_widget(top)
 
         # Middle row: filename
@@ -568,10 +570,16 @@ class LogsScreen(Screen):
         bot.add_widget(make_label(f'📅  {date_str}', size=12, color=MUTED_HEX))
         dur = rec.get('call_duration', 0)
         if dur:
-            bot.add_widget(make_label(f'⏱  {dur}s', size=12, color=MUTED_HEX))
+            _lbl2 = make_label(f'⏱  {dur}s', size=12, color=MUTED_HEX)
+            _lbl2.size_hint_x = None
+            _lbl2.width = dp(60)
+            bot.add_widget(_lbl2)
         bot.add_widget(Widget())
         spk_n = rec.get('total_speakers', 0)
-        bot.add_widget(make_label(f'👥  {spk_n}', size=12, color=BRAND_DARK_HEX))
+        _lbl3 = make_label(f'👥  {spk_n}', size=12, color=BRAND_DARK_HEX)
+        _lbl3.size_hint_x = None
+        _lbl3.width = dp(60)
+        bot.add_widget(_lbl3)
         card.add_widget(bot)
 
         # Tap to open detail
@@ -799,8 +807,10 @@ class DetailScreen(Screen):
 
         # Meta card
         meta = VCard(size_hint_y=None, height=dp(160))
-        meta.add_widget(make_label('Call Details', size=16, bold=True,
-                                   color=BRAND_DARK_HEX))
+        _lbl4 = make_label('Call Details', size=16, bold=True, color=BRAND_DARK_HEX)
+        _lbl4.size_hint_x = None
+        _lbl4.width = dp(200)
+        meta.add_widget(_lbl4)
 
         for label, value in [
             ('📞 Phone', rec.get('phone_number') or 'Unknown'),
@@ -960,8 +970,10 @@ class ProfilesScreen(Screen):
             row1.add_widget(make_label(f'#{p["id"]}  {p["name"]}', size=15,
                                         bold=True, color=BRAND_DARK_HEX))
             row1.add_widget(Widget())
-            row1.add_widget(make_label(f'{p["total_recordings"]} recordings',
-                                        size=11, color=ACCENT_HEX))
+            _lbl5 = make_label(f'{p["total_recordings"]} recordings', size=11, color=ACCENT_HEX)
+            _lbl5.size_hint_x = None
+            _lbl5.width = dp(100)
+            row1.add_widget(_lbl5)
             card.add_widget(row1)
             try:
                 first = p['first_seen'][:10]
