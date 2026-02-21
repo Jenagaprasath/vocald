@@ -36,7 +36,7 @@ from kivy.properties import StringProperty, ListProperty, NumericProperty
 # Conditional Android imports
 if platform == 'android':
     from android.permissions import request_permissions, Permission, check_permission
-    from android import mActivity
+    from android import mActivity, activity
     from jnius import autoclass
 
 # ─── Colour palette ──────────────────────────────────────────────────────────
@@ -1109,6 +1109,10 @@ class VocaldApp(App):
     def build(self):
         self.store = JsonStore(os.path.join(self.user_data_dir, 'settings.json'))
         state.app_dir = self.user_data_dir
+
+        # Register Android activity result callback
+        if platform == 'android':
+            activity.bind(on_activity_result=self.on_activity_result)
 
         # Initialise engine (set DB path etc.)
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'src'))
