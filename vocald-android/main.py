@@ -552,8 +552,7 @@ class LogsScreen(Screen):
         badge_text = ['⏳ Pending', '✅ Done', '❌ Failed'][status]
         badge_color = [WARN_HEX, ACCENT_HEX, DANGER_HEX][status]
         top.add_widget(make_label(badge_text, size=11, bold=True,
-                                  color=badge_color, size_hint_x=None,
-                                  width=dp(80)))
+                                  color=badge_color))
         card.add_widget(top)
 
         # Middle row: filename
@@ -569,12 +568,10 @@ class LogsScreen(Screen):
         bot.add_widget(make_label(f'📅  {date_str}', size=12, color=MUTED_HEX))
         dur = rec.get('call_duration', 0)
         if dur:
-            bot.add_widget(make_label(f'⏱  {dur}s', size=12, color=MUTED_HEX,
-                                      size_hint_x=None, width=dp(60)))
+            bot.add_widget(make_label(f'⏱  {dur}s', size=12, color=MUTED_HEX))
         bot.add_widget(Widget())
         spk_n = rec.get('total_speakers', 0)
-        bot.add_widget(make_label(f'👥  {spk_n}', size=12, color=BRAND_DARK_HEX,
-                                  size_hint_x=None, width=dp(40)))
+        bot.add_widget(make_label(f'👥  {spk_n}', size=12, color=BRAND_DARK_HEX))
         card.add_widget(bot)
 
         # Tap to open detail
@@ -812,8 +809,7 @@ class DetailScreen(Screen):
             ('📄 File', rec.get('filename', '')),
         ]:
             row = BoxLayout(size_hint_y=None, height=dp(24), spacing=dp(8))
-            row.add_widget(make_label(label, size=12, bold=True,
-                                      size_hint_x=None, width=dp(100)))
+            row.add_widget(make_label(label, size=12, bold=True))
             row.add_widget(make_label(str(value), size=12, color=MUTED_HEX))
             meta.add_widget(row)
         self._content.add_widget(meta)
@@ -965,8 +961,7 @@ class ProfilesScreen(Screen):
                                         bold=True, color=BRAND_DARK_HEX))
             row1.add_widget(Widget())
             row1.add_widget(make_label(f'{p["total_recordings"]} recordings',
-                                        size=11, color=ACCENT_HEX,
-                                        size_hint_x=None, width=dp(100)))
+                                        size=11, color=ACCENT_HEX))
             card.add_widget(row1)
             try:
                 first = p['first_seen'][:10]
