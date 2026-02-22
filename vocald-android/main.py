@@ -2,7 +2,7 @@
 Vocald — Android APK
 Main Kivy application entry point.
 Screens: Onboarding → Logs → Details → Profiles → Settings
-Responsive UI — adapts to all screen sizes.
+Fixed UI — no text overlap, clean card layout, dynamic heights.
 """
 
 import os
@@ -41,94 +41,106 @@ if platform == 'android':
     from android import mActivity, activity
     from jnius import autoclass
 
+
 # ─── Responsive helpers ───────────────────────────────────────────────────────
 def sw(pct):
-    """Screen width percentage."""
     return Window.width * pct / 100
 
 def sh(pct):
-    """Screen height percentage."""
     return Window.height * pct / 100
 
 def rsp(size):
-    """Responsive sp — scales font size relative to screen width.
-    Base is 360dp wide screen. Clamps between 0.8x and 1.4x."""
-    scale = max(0.8, min(1.4, Window.width / 360))
+    """Responsive font size. Clamps between 0.85x and 1.3x."""
+    scale = max(0.85, min(1.3, Window.width / 400))
     return sp(size * scale)
 
 def rdp(size):
-    """Responsive dp — scales dp relative to screen width."""
-    scale = max(0.85, min(1.3, Window.width / 360))
+    """Responsive dp. Clamps between 0.85x and 1.25x."""
+    scale = max(0.85, min(1.25, Window.width / 400))
     return dp(size * scale)
 
+
 # ─── Colour palette ──────────────────────────────────────────────────────────
-BRAND      = (0.310, 0.275, 0.506, 1)
-BRAND_DARK = (0.192, 0.180, 0.506, 1)
-ACCENT     = (0.063, 0.725, 0.506, 1)
-WARN       = (0.961, 0.620, 0.043, 1)
-DANGER     = (0.937, 0.267, 0.267, 1)
-BG         = (0.941, 0.949, 1.000, 1)
-WHITE      = (1, 1, 1, 1)
-LIGHT      = (0.953, 0.957, 0.965, 1)
-MUTED      = (0.420, 0.447, 0.502, 1)
-BLACK      = (0.122, 0.161, 0.216, 1)
-CARD_BG    = (1, 1, 1, 1)
+BRAND        = (0.216, 0.196, 0.553, 1)
+BRAND_DARK   = (0.149, 0.137, 0.420, 1)
+BRAND_LIGHT  = (0.580, 0.561, 0.902, 1)
+ACCENT       = (0.055, 0.698, 0.506, 1)
+WARN         = (0.953, 0.612, 0.071, 1)
+DANGER       = (0.918, 0.263, 0.263, 1)
+BG           = (0.953, 0.957, 0.976, 1)
+WHITE        = (1, 1, 1, 1)
+MUTED        = (0.435, 0.459, 0.514, 1)
+BLACK        = (0.110, 0.145, 0.208, 1)
+CARD_BG      = (1, 1, 1, 1)
+DIVIDER      = (0.906, 0.910, 0.925, 1)
 
-BRAND_HEX      = '#4F46E5'
-ACCENT_HEX     = '#10B981'
-WARN_HEX       = '#F59E0B'
-DANGER_HEX     = '#EF4444'
+BRAND_HEX      = '#3732A3'
+BRAND_DARK_HEX = '#261F6B'
+ACCENT_HEX     = '#0EB281'
+WARN_HEX       = '#F39C12'
+DANGER_HEX     = '#EA4343'
 WHITE_HEX      = '#FFFFFF'
-MUTED_HEX      = '#6B7280'
-BLACK_HEX      = '#1F2937'
-BG_HEX         = '#EFF6FF'
-BRAND_DARK_HEX = '#312E81'
+MUTED_HEX      = '#6F75A3'
+BLACK_HEX      = '#1C2535'
+BG_HEX         = '#F3F4F9'
 
 
-# ─── Utility widgets ──────────────────────────────────────────────────────────
-
-class VCard(BoxLayout):
-    """White rounded card."""
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self.orientation = 'vertical'
-        self.padding = rdp(14)
-        self.spacing = rdp(6)
-        with self.canvas.before:
-            Color(1, 1, 1, 1)
-            self._rect = RoundedRectangle(radius=[rdp(12)])
-        self.bind(pos=self._update, size=self._update)
-
-    def _update(self, *_):
-        self._rect.pos  = self.pos
-        self._rect.size = self.size
+# ─── Helper: hex colour ───────────────────────────────────────────────────────
+def _hex(h):
+    h = h.lstrip('#')
+    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+    return r / 255, g / 255, b / 255, 1
 
 
+# ─── Background rect helper ───────────────────────────────────────────────────
+def bg_rect(widget, color=BG):
+    with widget.canvas.before:
+        Color(*color)
+        widget._bg = Rectangle()
+    widget.bind(pos=lambda i, v: setattr(i._bg, 'pos', v),
+                size=lambda i, v: setattr(i._bg, 'size', v))
+
+
+# ─── Label factory ────────────────────────────────────────────────────────────
 def make_label(text, size=14, color=BLACK_HEX, bold=False, halign='left',
-               italic=False, markup=False):
+               italic=False, markup=False, wrap=True):
+    """
+    Creates a label that auto-sizes its height to fit text.
+    wrap=True  → text_size follows width (word-wrap, dynamic height)
+    wrap=False → single line, no wrapping
+    """
     lbl = Label(
         text=text,
         font_size=rsp(size),
         color=color if isinstance(color, tuple) else _hex(color),
-        bold=bold, italic=italic, halign=halign, markup=markup,
+        bold=bold,
+        italic=italic,
+        halign=halign,
+        valign='top',
+        markup=markup,
         size_hint_y=None,
         shorten=False,
     )
-    def _update_text_size(instance, value):
-        instance.text_size = (value, None)
-    lbl.bind(width=_update_text_size)
-    lbl.bind(texture_size=lambda i, v: setattr(i, 'height', v[1]))
+    if wrap:
+        lbl.bind(width=lambda i, w: setattr(i, 'text_size', (w, None)))
+        lbl.bind(texture_size=lambda i, ts: setattr(i, 'height', ts[1]))
+    else:
+        lbl.text_size = (None, None)
+        lbl.height = rsp(size) * 1.6
     return lbl
 
 
+# ─── Button factory ───────────────────────────────────────────────────────────
 def make_button(text, bg_color=BRAND, text_color=WHITE_HEX,
-                height=None, on_press=None, font_size=14, bold=True,
-                radius=None):
+                height=None, on_press=None, font_size=14, bold=True, radius=None):
     h = height if height is not None else rdp(48)
     r = radius if radius is not None else rdp(10)
     btn = Button(
-        text=text, size_hint=(1, None), height=h,
-        font_size=rsp(font_size), bold=bold,
+        text=text,
+        size_hint=(1, None),
+        height=h,
+        font_size=rsp(font_size),
+        bold=bold,
         background_color=(0, 0, 0, 0),
         color=text_color if isinstance(text_color, tuple) else _hex(text_color),
     )
@@ -142,22 +154,37 @@ def make_button(text, bg_color=BRAND, text_color=WHITE_HEX,
     return btn
 
 
-def _hex(h):
-    h = h.lstrip('#')
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    return r / 255, g / 255, b / 255, 1
+# ─── Card widget ──────────────────────────────────────────────────────────────
+class VCard(BoxLayout):
+    """
+    White rounded card. Height is dynamic by default (size_hint_y=None + auto).
+    Pass fixed_height=X to lock the height.
+    """
+    def __init__(self, fixed_height=None, **kwargs):
+        kwargs.setdefault('orientation', 'vertical')
+        kwargs.setdefault('size_hint_y', None)
+        kwargs.setdefault('padding', (rdp(14), rdp(12)))
+        kwargs.setdefault('spacing', rdp(8))
+        super().__init__(**kwargs)
+
+        with self.canvas.before:
+            Color(1, 1, 1, 1)
+            self._rect = RoundedRectangle(radius=[rdp(12)])
+        self.bind(pos=self._upd, size=self._upd)
+
+        if fixed_height is not None:
+            self.height = fixed_height
+        else:
+            # auto-height: expand to contain children
+            self.bind(minimum_height=self.setter('height'))
+
+    def _upd(self, *_):
+        self._rect.pos  = self.pos
+        self._rect.size = self.size
 
 
-def bg_rect(widget, color=BG):
-    with widget.canvas.before:
-        Color(*color)
-        widget._bg = Rectangle()
-    widget.bind(pos=lambda i, v: setattr(i._bg, 'pos', v),
-                size=lambda i, v: setattr(i._bg, 'size', v))
-
-
+# ─── Top bar ──────────────────────────────────────────────────────────────────
 def make_topbar(title, back_cb=None):
-    """Reusable responsive top bar."""
     h = rdp(56)
     topbar = BoxLayout(size_hint_y=None, height=h,
                        padding=(rdp(8), 0), spacing=rdp(4))
@@ -169,28 +196,52 @@ def make_topbar(title, back_cb=None):
 
     if back_cb:
         back = Button(
-            text='←', size_hint=(None, None),
-            size=(rdp(44), rdp(44)),
+            text='←', size_hint=(None, None), size=(rdp(44), rdp(44)),
             background_color=(0, 0, 0, 0),
-            color=_hex(WHITE_HEX), font_size=rsp(18),
+            color=_hex(WHITE_HEX), font_size=rsp(20),
         )
         back.bind(on_press=lambda _: back_cb())
         topbar.add_widget(back)
 
-    lbl = make_label(title, size=17, bold=True, color=WHITE_HEX)
+    lbl = Label(
+        text=title, font_size=rsp(17), bold=True,
+        color=_hex(WHITE_HEX), halign='left', valign='middle',
+    )
+    lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
     topbar.add_widget(lbl)
     return topbar
 
 
+# ─── Toast ────────────────────────────────────────────────────────────────────
 def show_toast(message, duration=2.5):
     box = BoxLayout(orientation='vertical', padding=rdp(16))
-    box.add_widget(make_label(message, size=13, halign='center'))
-    popup = Popup(title='', content=box,
-                  size_hint=(0.85, None), height=rdp(100),
-                  auto_dismiss=True,
-                  background_color=(*BRAND[:3], 0.95))
+    lbl = make_label(message, size=12, halign='center', color=WHITE_HEX)
+    box.add_widget(lbl)
+    popup = Popup(
+        title='', content=box,
+        size_hint=(0.85, None), height=rdp(80),
+        auto_dismiss=True,
+        background_color=(*BRAND_DARK[:3], 0.95),
+        separator_height=0,
+    )
     popup.open()
     Clock.schedule_once(lambda _: popup.dismiss(), duration)
+
+
+# ─── Divider ──────────────────────────────────────────────────────────────────
+def make_divider():
+    d = Widget(size_hint_y=None, height=dp(1))
+    with d.canvas:
+        Color(*DIVIDER)
+        d._rect = Rectangle()
+    d.bind(pos=lambda i, v: setattr(i._rect, 'pos', v),
+           size=lambda i, v: setattr(i._rect, 'size', v))
+    return d
+
+
+# ─── Spacer ───────────────────────────────────────────────────────────────────
+def spacer(h=8):
+    return Widget(size_hint_y=None, height=rdp(h))
 
 
 # ─── Global app state ─────────────────────────────────────────────────────────
@@ -200,7 +251,6 @@ class VocaldState:
     engine_ready: bool = False
     is_analysing: bool = False
     analysis_cancelled: bool = False
-
 
 state = VocaldState()
 
@@ -218,47 +268,56 @@ class OnboardingScreen(Screen):
     def _clear(self):
         self.clear_widgets()
 
+    # ── Step 0: Welcome ───────────────────────────────────────────────────────
     def _build_step_0(self):
         self._clear()
         root = BoxLayout(orientation='vertical',
-                         padding=(rdp(24), rdp(32)),
-                         spacing=rdp(16))
+                         padding=(rdp(24), rdp(40)),
+                         spacing=rdp(20))
         bg_rect(root)
 
-        root.add_widget(Widget(size_hint_y=0.08))
-        root.add_widget(make_label('🎙️', size=56, halign='center'))
-        root.add_widget(make_label('Vocald', size=32, bold=True,
+        # Logo + title block
+        root.add_widget(spacer(20))
+        root.add_widget(make_label('🎙️', size=52, halign='center'))
+        root.add_widget(spacer(4))
+        root.add_widget(make_label('Vocald', size=30, bold=True,
                                    color=BRAND_DARK_HEX, halign='center'))
         root.add_widget(make_label('Call Recording Speaker ID',
-                                   size=15, color=MUTED_HEX, halign='center'))
-        root.add_widget(Widget(size_hint_y=0.05))
+                                   size=14, color=MUTED_HEX, halign='center'))
+        root.add_widget(spacer(16))
 
-        card = VCard(size_hint_y=None, height=rdp(150))
-        card.add_widget(make_label('🔒  100% Private', size=15, bold=True,
+        # Privacy card
+        card = VCard()
+        card.add_widget(make_label('🔒  100% Private', size=14, bold=True,
                                    color=BRAND_DARK_HEX))
+        card.add_widget(spacer(4))
         card.add_widget(make_label(
-            'Everything runs on your phone. No recordings ever leave your device. '
-            'Audio is deleted after analysis — only voice fingerprints are stored.',
+            'Everything runs on your phone. No recordings ever leave your '
+            'device. Audio is deleted after analysis — only voice '
+            'fingerprints are stored.',
             size=12, color=MUTED_HEX))
         root.add_widget(card)
 
-        root.add_widget(Widget(size_hint_y=1))
+        root.add_widget(Widget())  # flex spacer
         root.add_widget(make_button('GET STARTED', on_press=self._step1,
-                                    height=rdp(50), font_size=15))
-        root.add_widget(Widget(size_hint_y=0.02))
+                                    height=rdp(52), font_size=15))
+        root.add_widget(spacer(8))
         self.add_widget(root)
 
+    # ── Step 1: Permissions ───────────────────────────────────────────────────
     def _step1(self, *_):
         self._clear()
         root = BoxLayout(orientation='vertical',
-                         padding=(rdp(20), rdp(24)),
+                         padding=(rdp(20), rdp(30)),
                          spacing=rdp(14))
         bg_rect(root)
 
-        root.add_widget(make_label('Permissions Needed', size=24, bold=True,
+        root.add_widget(make_label('Permissions Needed', size=22, bold=True,
                                    color=BRAND_DARK_HEX))
-        root.add_widget(make_label('Vocald needs these to work:',
-                                   size=13, color=MUTED_HEX))
+        root.add_widget(spacer(2))
+        root.add_widget(make_label('Vocald needs these to work:', size=13,
+                                   color=MUTED_HEX))
+        root.add_widget(spacer(6))
 
         for icon, title, desc in [
             ('📂', 'Storage Access',
@@ -266,24 +325,33 @@ class OnboardingScreen(Screen):
             ('📞', 'Call Log',
              'Get real call time, phone number & duration from Android'),
         ]:
-            c = VCard(size_hint_y=None, height=rdp(80))
-            row = BoxLayout(spacing=rdp(12))
-            icon_lbl = make_label(icon, size=26)
-            icon_lbl.size_hint_x = None
-            icon_lbl.width = rdp(36)
-            row.add_widget(icon_lbl)
-            col = BoxLayout(orientation='vertical', spacing=rdp(2))
-            col.add_widget(make_label(title, size=13, bold=True))
-            col.add_widget(make_label(desc, size=11, color=MUTED_HEX))
-            row.add_widget(col)
-            c.add_widget(row)
-            root.add_widget(c)
+            card = VCard()
+            row = BoxLayout(spacing=rdp(12), size_hint_y=None)
+            row.bind(minimum_height=row.setter('height'))
 
-        root.add_widget(Widget(size_hint_y=1))
+            icon_lbl = Label(text=icon, font_size=rsp(26),
+                             size_hint=(None, None), size=(rdp(40), rdp(40)))
+            row.add_widget(icon_lbl)
+
+            col = BoxLayout(orientation='vertical', spacing=rdp(4))
+            col.bind(minimum_height=col.setter('height'))
+            t = make_label(title, size=13, bold=True)
+            d = make_label(desc, size=11, color=MUTED_HEX)
+            col.add_widget(t)
+            col.add_widget(d)
+            col.size_hint_y = None
+            col.bind(minimum_height=col.setter('height'))
+            row.add_widget(col)
+            row.size_hint_y = None
+            row.bind(minimum_height=row.setter('height'))
+            card.add_widget(row)
+            root.add_widget(card)
+
+        root.add_widget(Widget())
         root.add_widget(make_button('GRANT PERMISSIONS',
                                     on_press=self._request_permissions,
-                                    height=rdp(50), font_size=14))
-        root.add_widget(Widget(size_hint_y=0.02))
+                                    height=rdp(52), font_size=14))
+        root.add_widget(spacer(8))
         self.add_widget(root)
 
     def _request_permissions(self, *_):
@@ -300,42 +368,51 @@ class OnboardingScreen(Screen):
     def _on_permissions(self, permissions, grants):
         Clock.schedule_once(lambda _: self._step2(), 0.3)
 
+    # ── Step 2: Folder selection ──────────────────────────────────────────────
     def _step2(self, *_):
         self._clear()
         root = BoxLayout(orientation='vertical',
-                         padding=(rdp(20), rdp(24)),
+                         padding=(rdp(20), rdp(30)),
                          spacing=rdp(14))
         bg_rect(root)
 
-        root.add_widget(make_label('Select Recordings Folder',
-                                   size=22, bold=True, color=BRAND_DARK_HEX))
+        root.add_widget(make_label('Select Recordings Folder', size=22,
+                                   bold=True, color=BRAND_DARK_HEX))
+        root.add_widget(spacer(2))
         root.add_widget(make_label(
             'Choose the folder where your phone saves call recordings.',
             size=12, color=MUTED_HEX))
+        root.add_widget(spacer(4))
 
-        card = VCard(size_hint_y=None, height=rdp(110))
+        # Common paths hint card
+        card = VCard()
         card.add_widget(make_label('📁  Common folder paths:', size=12, bold=True))
+        card.add_widget(spacer(4))
         for path in ['/sdcard/CallRecordings',
                      '/sdcard/MIUI/sound_recorder/call_rec',
                      '/sdcard/Recordings/Call']:
-            card.add_widget(make_label(f'  • {path}', size=10, color=MUTED_HEX))
+            card.add_widget(make_label(f'• {path}', size=11, color=MUTED_HEX))
         root.add_widget(card)
+        root.add_widget(spacer(4))
 
-        self._folder_label = make_label('No folder selected', size=12,
-                                        color=MUTED_HEX, halign='center')
+        self._folder_label = make_label('No folder selected yet.',
+                                        size=12, color=MUTED_HEX,
+                                        halign='center')
         root.add_widget(self._folder_label)
-        root.add_widget(Widget(size_hint_y=1))
+
+        root.add_widget(Widget())
         root.add_widget(make_button('SELECT FOLDER',
                                     on_press=self._open_folder_picker,
-                                    bg_color=(0.53, 0.53, 0.93, 1),
-                                    height=rdp(48), font_size=14))
+                                    bg_color=BRAND_LIGHT,
+                                    height=rdp(50), font_size=14))
+        root.add_widget(spacer(6))
         self._use_btn = make_button('USE THIS FOLDER',
                                     on_press=self._step3,
                                     bg_color=ACCENT,
-                                    height=rdp(48), font_size=14)
+                                    height=rdp(50), font_size=14)
         self._use_btn.disabled = True
         root.add_widget(self._use_btn)
-        root.add_widget(Widget(size_hint_y=0.02))
+        root.add_widget(spacer(8))
         self.add_widget(root)
 
     def _open_folder_picker(self, *_):
@@ -353,12 +430,13 @@ class OnboardingScreen(Screen):
         box = BoxLayout(orientation='vertical', padding=rdp(16), spacing=rdp(12))
         box.add_widget(make_label('Enter folder path:', size=13))
         ti = TextInput(size_hint_y=None, height=rdp(44),
-                       hint_text='/path/to/recordings', multiline=False)
+                       hint_text='/path/to/recordings', multiline=False,
+                       font_size=rsp(13))
         box.add_widget(ti)
         btn = make_button('OK', height=rdp(44))
         box.add_widget(btn)
         popup = Popup(title='Folder Path', content=box,
-                      size_hint=(0.9, None), height=rdp(200))
+                      size_hint=(0.9, None), height=rdp(220))
         def _ok(*_):
             path = ti.text.strip()
             if path and os.path.isdir(path):
@@ -391,20 +469,24 @@ class OnboardingScreen(Screen):
         self._folder_label.color = _hex(ACCENT_HEX)
         self._use_btn.disabled = False
 
+    # ── Step 3: Initial scan ──────────────────────────────────────────────────
     def _step3(self, *_):
         if not state.folder_path:
             show_toast('Please select a folder first')
             return
         self._clear()
         root = BoxLayout(orientation='vertical',
-                         padding=(rdp(20), rdp(24)),
-                         spacing=rdp(14))
+                         padding=(rdp(20), rdp(30)),
+                         spacing=rdp(16))
         bg_rect(root)
-        root.add_widget(make_label('Setting Up...', size=22, bold=True,
+
+        root.add_widget(make_label('Setting Up…', size=22, bold=True,
                                    color=BRAND_DARK_HEX))
-        self._status_label = make_label('Scanning folder...', size=13,
+        root.add_widget(spacer(4))
+        self._status_label = make_label('Scanning folder…', size=13,
                                         color=MUTED_HEX)
         root.add_widget(self._status_label)
+        root.add_widget(spacer(8))
         self._pb = ProgressBar(max=100, size_hint_y=None, height=rdp(10))
         root.add_widget(self._pb)
         self.add_widget(root)
@@ -414,7 +496,7 @@ class OnboardingScreen(Screen):
         from folder_scanner import mark_all_existing_as_seen, count_all_audio_files
         import vocald_engine as engine
         total = count_all_audio_files(state.folder_path)
-        self._update_status(f'Found {total} recordings — marking as seen...')
+        self._update_status(f'Found {total} recordings — marking as seen…')
         self._update_pb(30)
         marked = mark_all_existing_as_seen(
             state.folder_path,
@@ -465,9 +547,15 @@ class LogsScreen(Screen):
             topbar._bg = Rectangle()
         topbar.bind(pos=lambda i, v: setattr(i._bg, 'pos', v),
                     size=lambda i, v: setattr(i._bg, 'size', v))
-        topbar.add_widget(make_label('🎙️ Vocald', size=17, bold=True,
-                                     color=WHITE_HEX))
+
+        title_lbl = Label(
+            text='🎙️  Vocald', font_size=rsp(17), bold=True,
+            color=_hex(WHITE_HEX), halign='left', valign='middle',
+        )
+        title_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+        topbar.add_widget(title_lbl)
         topbar.add_widget(Widget())
+
         for icon, screen in [('👤', 'profiles'), ('⚙️', 'settings')]:
             btn = Button(text=icon, size_hint=(None, None),
                          size=(rdp(44), rdp(44)),
@@ -478,57 +566,80 @@ class LogsScreen(Screen):
         root.add_widget(topbar)
 
         # ── Action bar ───────────────────────────────────────────────────────
-        actbar = BoxLayout(size_hint_y=None, height=rdp(54),
-                           padding=(rdp(10), rdp(7)), spacing=rdp(8))
-        self._scan_btn = make_button('🔍 SCAN NOW', height=rdp(40),
-                                     on_press=self._trigger_scan, font_size=12)
+        actbar = BoxLayout(size_hint_y=None, height=rdp(60),
+                           padding=(rdp(10), rdp(8)), spacing=rdp(8))
+        self._scan_btn = make_button('🔍  SCAN NOW', height=rdp(44),
+                                     on_press=self._trigger_scan, font_size=13)
         actbar.add_widget(self._scan_btn)
-        self._upload_btn = make_button('📂 UPLOAD', height=rdp(40),
+        self._upload_btn = make_button('📂  UPLOAD', height=rdp(44),
                                        on_press=self._trigger_upload,
-                                       bg_color=(0.53, 0.53, 0.93, 1),
-                                       font_size=12)
+                                       bg_color=BRAND_LIGHT, font_size=13)
         actbar.add_widget(self._upload_btn)
         root.add_widget(actbar)
 
         # ── Status bar ───────────────────────────────────────────────────────
-        self._status_bar = BoxLayout(size_hint_y=None, height=rdp(32),
-                                     padding=(rdp(12), 0))
-        self._status_lbl = make_label('', size=11, color=MUTED_HEX)
-        self._status_bar.add_widget(self._status_lbl)
-        root.add_widget(self._status_bar)
+        sbar = BoxLayout(size_hint_y=None, height=rdp(28),
+                         padding=(rdp(14), 0))
+        self._status_lbl = Label(text='', font_size=rsp(11),
+                                 color=_hex(MUTED_HEX),
+                                 halign='left', valign='middle')
+        self._status_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+        sbar.add_widget(self._status_lbl)
+        root.add_widget(sbar)
 
         # ── Search ───────────────────────────────────────────────────────────
-        search_row = BoxLayout(size_hint_y=None, height=rdp(46),
-                               padding=(rdp(10), rdp(3)))
+        search_row = BoxLayout(size_hint_y=None, height=rdp(50),
+                               padding=(rdp(10), rdp(4)))
         self._search_input = TextInput(
-            hint_text='🔎  Search by filename or phone...',
-            size_hint_y=None, height=rdp(40), multiline=False,
+            hint_text='🔎  Search by filename or phone…',
+            size_hint_y=None, height=rdp(42), multiline=False,
             font_size=rsp(12), background_color=_hex(WHITE_HEX),
+            foreground_color=_hex(BLACK_HEX),
+            padding=(rdp(10), rdp(10)),
         )
         self._search_input.bind(text=self._on_search)
         search_row.add_widget(self._search_input)
         root.add_widget(search_row)
 
-        # ── Progress bar ─────────────────────────────────────────────────────
-        self._progress_box = BoxLayout(orientation='vertical',
-                                       size_hint_y=None, height=rdp(58),
-                                       padding=(rdp(10), rdp(4)),
-                                       spacing=rdp(3))
-        self._progress_lbl = make_label('', size=11, color=BRAND_DARK_HEX)
+        # ── Progress block ───────────────────────────────────────────────────
+        self._progress_box = BoxLayout(
+            orientation='vertical',
+            size_hint_y=None, height=rdp(80),
+            padding=(rdp(12), rdp(6)), spacing=rdp(4),
+        )
+        with self._progress_box.canvas.before:
+            Color(0.937, 0.941, 0.976, 1)
+            self._progress_box._bg = Rectangle()
+        self._progress_box.bind(
+            pos=lambda i, v: setattr(i._bg, 'pos', v),
+            size=lambda i, v: setattr(i._bg, 'size', v),
+        )
+        self._progress_lbl = Label(
+            text='', font_size=rsp(11),
+            color=_hex(BRAND_DARK_HEX),
+            halign='left', valign='middle',
+            size_hint_y=None, height=rdp(20),
+        )
+        self._progress_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
         self._progress_box.add_widget(self._progress_lbl)
-        self._progress_bar = ProgressBar(max=100, size_hint_y=None,
-                                         height=rdp(8))
+        self._progress_bar = ProgressBar(max=100, size_hint_y=None, height=rdp(10))
         self._progress_box.add_widget(self._progress_bar)
-        cancel_btn = make_button('Cancel', height=rdp(26), font_size=11,
+        cancel_row = BoxLayout(size_hint_y=None, height=rdp(30), spacing=rdp(8))
+        cancel_row.add_widget(Widget())
+        cancel_btn = make_button('✕  Cancel', height=rdp(28), font_size=11,
                                  bg_color=DANGER,
                                  on_press=self._cancel_analysis)
-        self._progress_box.add_widget(cancel_btn)
+        cancel_btn.size_hint_x = None
+        cancel_btn.width = rdp(100)
+        cancel_row.add_widget(cancel_btn)
+        self._progress_box.add_widget(cancel_row)
         self._progress_box.opacity = 0
         root.add_widget(self._progress_box)
 
         # ── Scrollable list ───────────────────────────────────────────────────
         self._scroll = ScrollView()
-        self._list = GridLayout(cols=1, spacing=rdp(10), padding=rdp(10),
+        self._list = GridLayout(cols=1, spacing=rdp(10),
+                                padding=(rdp(10), rdp(6)),
                                 size_hint_y=None)
         self._list.bind(minimum_height=self._list.setter('height'))
         self._scroll.add_widget(self._list)
@@ -544,8 +655,8 @@ class LogsScreen(Screen):
         stats = engine.get_db_stats()
         folder_name = os.path.basename(state.folder_path) or 'No folder'
         self._status_lbl.text = (
-            f'📁 {folder_name}  •  {stats["recordings"]} recordings  '
-            f'•  {stats["voice_profiles"]} voices'
+            f'📁 {folder_name}  •  {stats["recordings"]} recordings'
+            f'  •  {stats["voice_profiles"]} voices'
         )
         self._render_list(self._recordings)
 
@@ -566,57 +677,83 @@ class LogsScreen(Screen):
                 'No recordings yet.\nTap SCAN NOW to check for new calls.',
                 size=13, color=MUTED_HEX, halign='center')
             lbl.size_hint_y = None
-            lbl.height = rdp(80)
+            self._list.add_widget(spacer(20))
             self._list.add_widget(lbl)
             return
         for rec in records:
             self._list.add_widget(self._make_card(rec))
 
     def _make_card(self, rec):
-        card = VCard(size_hint_y=None, height=rdp(105))
+        """
+        Card layout (all rows explicitly sized to prevent overlap):
+          Row 1: phone number  |  status badge
+          Row 2: filename (wraps)
+          Row 3: date  |  duration  |  speakers
+        """
+        card = VCard()
         card._rid = rec['id']
 
-        # Top row: phone + badge
-        top = BoxLayout(size_hint_y=None, height=rdp(26), spacing=rdp(6))
+        # Row 1: phone + badge
+        row1 = BoxLayout(size_hint_y=None, height=rdp(28), spacing=rdp(6))
         phone = rec.get('phone_number') or 'Unknown number'
-        top.add_widget(make_label(f'📞  {phone}', size=13, bold=True,
-                                  color=BRAND_DARK_HEX))
-        top.add_widget(Widget())
+        phone_lbl = Label(
+            text=f'📞  {phone}', font_size=rsp(13), bold=True,
+            color=_hex(BRAND_DARK_HEX), halign='left', valign='middle',
+        )
+        phone_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+        row1.add_widget(phone_lbl)
+
         status = rec.get('processed', 0)
-        badge_text  = ['⏳ Pending', '✅ Done', '❌ Failed'][status]
-        badge_color = [WARN_HEX, ACCENT_HEX, DANGER_HEX][status]
-        badge = make_label(badge_text, size=10, bold=True, color=badge_color)
-        badge.size_hint_x = None
-        badge.width = rdp(75)
-        top.add_widget(badge)
-        card.add_widget(top)
+        badge_text  = ('⏳ Pending', '✅ Done', '❌ Failed')[status]
+        badge_color = (WARN_HEX, ACCENT_HEX, DANGER_HEX)[status]
+        badge = Label(
+            text=badge_text, font_size=rsp(10), bold=True,
+            color=_hex(badge_color), halign='right', valign='middle',
+            size_hint=(None, None), size=(rdp(72), rdp(28)),
+        )
+        badge.text_size = (rdp(72), rdp(28))
+        row1.add_widget(badge)
+        card.add_widget(row1)
 
-        # Filename row
-        card.add_widget(make_label(rec['filename'], size=11, color=MUTED_HEX))
+        # Row 2: filename
+        fname_lbl = make_label(rec['filename'], size=11, color=MUTED_HEX)
+        card.add_widget(fname_lbl)
+        card.add_widget(spacer(2))
 
-        # Bottom row: date / duration / speakers
-        bot = BoxLayout(size_hint_y=None, height=rdp(22), spacing=rdp(10))
+        # Row 3: date | duration | speakers
+        row3 = BoxLayout(size_hint_y=None, height=rdp(22), spacing=rdp(8))
         try:
             dt = datetime.fromisoformat(rec['call_date'])
             date_str = dt.strftime('%d %b %Y  %I:%M %p')
         except Exception:
-            date_str = rec.get('call_date', '')
-        bot.add_widget(make_label(f'📅  {date_str}', size=10, color=MUTED_HEX))
+            date_str = rec.get('call_date', '')[:16].replace('T', '  ')
+
+        date_lbl = Label(
+            text=f'📅  {date_str}', font_size=rsp(10),
+            color=_hex(MUTED_HEX), halign='left', valign='middle',
+        )
+        date_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+        row3.add_widget(date_lbl)
 
         dur = rec.get('call_duration', 0)
         if dur:
-            dur_lbl = make_label(f'⏱ {dur}s', size=10, color=MUTED_HEX)
-            dur_lbl.size_hint_x = None
-            dur_lbl.width = rdp(55)
-            bot.add_widget(dur_lbl)
+            dur_lbl = Label(
+                text=f'⏱ {dur}s', font_size=rsp(10),
+                color=_hex(MUTED_HEX), halign='right', valign='middle',
+                size_hint=(None, None), size=(rdp(60), rdp(22)),
+            )
+            dur_lbl.text_size = (rdp(60), rdp(22))
+            row3.add_widget(dur_lbl)
 
-        bot.add_widget(Widget())
         spk_n = rec.get('total_speakers', 0)
-        spk_lbl = make_label(f'👥 {spk_n}', size=10, color=BRAND_DARK_HEX)
-        spk_lbl.size_hint_x = None
-        spk_lbl.width = rdp(40)
-        bot.add_widget(spk_lbl)
-        card.add_widget(bot)
+        spk_lbl = Label(
+            text=f'👥 {spk_n}', font_size=rsp(10),
+            color=_hex(BRAND_DARK_HEX), halign='right', valign='middle',
+            size_hint=(None, None), size=(rdp(44), rdp(22)),
+        )
+        spk_lbl.text_size = (rdp(44), rdp(22))
+        row3.add_widget(spk_lbl)
+        card.add_widget(row3)
 
         card.bind(on_touch_up=lambda inst, touch:
                   self._open_detail(inst._rid)
@@ -659,12 +796,13 @@ class LogsScreen(Screen):
         box = BoxLayout(orientation='vertical', padding=rdp(16), spacing=rdp(12))
         box.add_widget(make_label('Enter audio file path:', size=13))
         ti = TextInput(size_hint_y=None, height=rdp(44),
-                       hint_text='/path/to/recording.wav', multiline=False)
+                       hint_text='/path/to/recording.wav', multiline=False,
+                       font_size=rsp(13))
         box.add_widget(ti)
         btn = make_button('Analyse', height=rdp(44))
         box.add_widget(btn)
         popup = Popup(title='Upload File', content=box,
-                      size_hint=(0.9, None), height=rdp(220))
+                      size_hint=(0.9, None), height=rdp(240))
         def _ok(*_):
             path = ti.text.strip()
             popup.dismiss()
@@ -700,7 +838,7 @@ class LogsScreen(Screen):
             fname = file_info['filename']
             fpath = file_info['filepath']
             self._update_progress(
-                f'Analysing {idx+1}/{total}: {fname}',
+                f'Analysing {idx + 1}/{total}: {fname}',
                 int((idx / total) * 90)
             )
             call_date = file_info['estimated_call_time'].isoformat()
@@ -729,7 +867,8 @@ class LogsScreen(Screen):
         try:
             speakers = engine.analyse_audio_file(filepath, fname, _cb)
             engine.update_recording_after_analysis(rid, speakers)
-            engine.mark_file_processed(fname, int(os.path.getmtime(filepath)*1000))
+            engine.mark_file_processed(
+                fname, int(os.path.getmtime(filepath) * 1000))
         except Exception as e:
             engine.mark_recording_failed(rid, str(e))
         self._update_progress('✅  Done', 100)
@@ -739,7 +878,7 @@ class LogsScreen(Screen):
 
     def _cancel_analysis(self, *_):
         state.analysis_cancelled = True
-        show_toast('Cancelling after current file...')
+        show_toast('Cancelling after current file…')
 
     @mainthread
     def _set_scanning_ui(self, active: bool):
@@ -769,9 +908,10 @@ class DetailScreen(Screen):
     def _build(self):
         root = BoxLayout(orientation='vertical')
         bg_rect(root)
-        root.add_widget(make_topbar('Recording', back_cb=self._go_back))
+        root.add_widget(make_topbar('Recording Detail', back_cb=self._go_back))
         scroll = ScrollView()
-        self._content = GridLayout(cols=1, spacing=rdp(10), padding=rdp(12),
+        self._content = GridLayout(cols=1, spacing=rdp(10),
+                                   padding=(rdp(12), rdp(10)),
                                    size_hint_y=None)
         self._content.bind(minimum_height=self._content.setter('height'))
         scroll.add_widget(self._content)
@@ -787,30 +927,41 @@ class DetailScreen(Screen):
         self._content.clear_widgets()
         rec = self._recording
         if not rec:
-            self._content.add_widget(make_label('Recording not found', size=14))
+            self._content.add_widget(
+                make_label('Recording not found.', size=14, color=DANGER_HEX))
             return
 
         # Meta card
-        meta = VCard(size_hint_y=None, height=rdp(155))
+        meta = VCard()
         meta.add_widget(make_label('Call Details', size=15, bold=True,
                                    color=BRAND_DARK_HEX))
-        for label, value in [
-            ('📞 Phone',    rec.get('phone_number') or 'Unknown'),
-            ('📅 Date',     rec.get('call_date', '')[:19].replace('T', '  ')),
-            ('⏱ Duration', f'{rec.get("call_duration", 0)} seconds'),
-            ('📄 File',     rec.get('filename', '')),
-        ]:
-            row = BoxLayout(size_hint_y=None, height=rdp(24), spacing=rdp(8))
-            lbl_w = make_label(label, size=11, bold=True)
-            lbl_w.size_hint_x = None
-            lbl_w.width = rdp(90)
-            row.add_widget(lbl_w)
-            row.add_widget(make_label(str(value), size=11, color=MUTED_HEX))
-            meta.add_widget(row)
-        self._content.add_widget(meta)
+        meta.add_widget(make_divider())
+        meta.add_widget(spacer(4))
 
+        rows = [
+            ('📞 Phone',     rec.get('phone_number') or 'Unknown'),
+            ('📅 Date',      rec.get('call_date', '')[:19].replace('T', '  ')),
+            ('⏱ Duration',  f'{rec.get("call_duration", 0)} seconds'),
+            ('📄 File',      rec.get('filename', '')),
+        ]
+        for label, value in rows:
+            row = BoxLayout(size_hint_y=None, height=rdp(26), spacing=rdp(10))
+            l = Label(text=label, font_size=rsp(11), bold=True,
+                      color=_hex(BLACK_HEX), halign='left', valign='middle',
+                      size_hint=(None, None), size=(rdp(85), rdp(26)))
+            l.text_size = (rdp(85), rdp(26))
+            row.add_widget(l)
+            v = Label(text=str(value), font_size=rsp(11),
+                      color=_hex(MUTED_HEX), halign='left', valign='middle')
+            v.bind(size=lambda i, s: setattr(i, 'text_size', s))
+            row.add_widget(v)
+            meta.add_widget(row)
+
+        self._content.add_widget(meta)
+        self._content.add_widget(spacer(4))
         self._content.add_widget(make_label('Identified Speakers', size=15,
-                                             bold=True, color=BRAND_DARK_HEX))
+                                            bold=True, color=BRAND_DARK_HEX))
+
         speakers = rec.get('speakers', [])
         if not speakers:
             self._content.add_widget(
@@ -820,26 +971,41 @@ class DetailScreen(Screen):
                 self._content.add_widget(self._make_speaker_card(spk))
 
     def _make_speaker_card(self, spk):
-        card = VCard(size_hint_y=None, height=rdp(110))
-        top = BoxLayout(size_hint_y=None, height=rdp(30), spacing=rdp(8))
-        top.add_widget(make_label(f'👤  {spk["name"]}', size=14, bold=True,
-                                  color=BRAND_DARK_HEX))
-        top.add_widget(Widget())
-        edit_btn = make_button('✏️ Edit', height=rdp(28), font_size=10,
-                               bg_color=(0.53, 0.53, 0.93, 1))
+        card = VCard()
+
+        # Speaker name row + edit button
+        top = BoxLayout(size_hint_y=None, height=rdp(34), spacing=rdp(8))
+        name_lbl = Label(
+            text=f'👤  {spk["name"]}', font_size=rsp(14), bold=True,
+            color=_hex(BRAND_DARK_HEX), halign='left', valign='middle',
+        )
+        name_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+        top.add_widget(name_lbl)
+
+        edit_btn = make_button('✏️ Edit', height=rdp(30), font_size=11,
+                               bg_color=BRAND_LIGHT)
         edit_btn.size_hint_x = None
-        edit_btn.width = rdp(65)
+        edit_btn.width = rdp(72)
         top.add_widget(edit_btn)
         card.add_widget(top)
+
+        # Confidence text
         conf = spk.get('confidence', 0)
         card.add_widget(make_label(f'Confidence: {conf:.1f}%', size=11,
                                    color=MUTED_HEX))
+
+        # Voice profile link
         if spk.get('voice_profile_id'):
             card.add_widget(make_label(
                 f'🔗 Voice Profile #{spk["voice_profile_id"]}',
-                size=10, color=BRAND_DARK_HEX))
+                size=10, color=BRAND_HEX))
+
+        card.add_widget(spacer(4))
+
+        # Progress bar
         pb = ProgressBar(max=100, value=conf, size_hint_y=None, height=rdp(8))
         card.add_widget(pb)
+
         edit_btn.bind(on_press=lambda _: self._edit_speaker_name(spk))
         return card
 
@@ -847,12 +1013,12 @@ class DetailScreen(Screen):
         box = BoxLayout(orientation='vertical', padding=rdp(16), spacing=rdp(12))
         box.add_widget(make_label(f'Rename: {spk["name"]}', size=13))
         ti = TextInput(text=spk['name'], size_hint_y=None, height=rdp(44),
-                       multiline=False)
+                       multiline=False, font_size=rsp(13))
         box.add_widget(ti)
         btn = make_button('Save', height=rdp(44))
         box.add_widget(btn)
         popup = Popup(title='Edit Speaker', content=box,
-                      size_hint=(0.9, None), height=rdp(220))
+                      size_hint=(0.9, None), height=rdp(240))
         def _save(*_):
             new_name = ti.text.strip()
             if new_name:
@@ -886,7 +1052,8 @@ class ProfilesScreen(Screen):
         bg_rect(root)
         root.add_widget(make_topbar('Voice Profiles', back_cb=self._go_back))
         scroll = ScrollView()
-        self._content = GridLayout(cols=1, spacing=rdp(10), padding=rdp(12),
+        self._content = GridLayout(cols=1, spacing=rdp(10),
+                                   padding=(rdp(12), rdp(10)),
                                    size_hint_y=None)
         self._content.bind(minimum_height=self._content.setter('height'))
         scroll.add_widget(self._content)
@@ -902,41 +1069,58 @@ class ProfilesScreen(Screen):
         profiles = engine.get_voice_profiles()
         stats = engine.get_db_stats()
 
-        sc = VCard(size_hint_y=None, height=rdp(75))
+        # Stats summary card
+        sc = VCard()
         sc.add_widget(make_label(
             f'📊  {stats["voice_profiles"]} voice profiles  •  '
             f'{stats["recordings"]} recordings',
-            size=12, bold=True, color=BRAND_DARK_HEX))
+            size=13, bold=True, color=BRAND_DARK_HEX))
+        sc.add_widget(spacer(4))
         sc.add_widget(make_label(
-            'Embeddings are 256-dim voice fingerprints stored locally.',
-            size=10, color=MUTED_HEX))
+            'Voice fingerprints are stored locally on your device.',
+            size=11, color=MUTED_HEX))
         self._content.add_widget(sc)
 
         if not profiles:
+            self._content.add_widget(spacer(10))
             self._content.add_widget(make_label(
-                'No voice profiles yet.\nAnalyse some recordings to build the database.',
+                'No voice profiles yet.\n'
+                'Analyse some recordings to build the database.',
                 size=12, color=MUTED_HEX, halign='center'))
             return
 
         for p in profiles:
-            card = VCard(size_hint_y=None, height=rdp(90))
-            row1 = BoxLayout(size_hint_y=None, height=rdp(28), spacing=rdp(6))
-            row1.add_widget(make_label(f'#{p["id"]}  {p["name"]}', size=14,
-                                       bold=True, color=BRAND_DARK_HEX))
-            row1.add_widget(Widget())
-            rec_lbl = make_label(f'{p["total_recordings"]} recordings',
-                                 size=10, color=ACCENT_HEX)
-            rec_lbl.size_hint_x = None
-            rec_lbl.width = rdp(95)
+            card = VCard()
+
+            # Name + recording count row
+            row1 = BoxLayout(size_hint_y=None, height=rdp(30), spacing=rdp(6))
+            name_lbl = Label(
+                text=f'#{p["id"]}  {p["name"]}', font_size=rsp(14), bold=True,
+                color=_hex(BRAND_DARK_HEX), halign='left', valign='middle',
+            )
+            name_lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
+            row1.add_widget(name_lbl)
+
+            rec_lbl = Label(
+                text=f'{p["total_recordings"]} recordings',
+                font_size=rsp(10), color=_hex(ACCENT_HEX),
+                halign='right', valign='middle',
+                size_hint=(None, None), size=(rdp(100), rdp(30)),
+            )
+            rec_lbl.text_size = (rdp(100), rdp(30))
             row1.add_widget(rec_lbl)
             card.add_widget(row1)
+
+            # Date row
             try:
                 first = p['first_seen'][:10]
                 last  = p['last_seen'][:10]
             except Exception:
-                first = last = ''
+                first = last = 'N/A'
             card.add_widget(make_label(
-                f'First: {first}  •  Last: {last}', size=10, color=MUTED_HEX))
+                f'First seen: {first}  •  Last seen: {last}',
+                size=10, color=MUTED_HEX))
+
             self._content.add_widget(card)
 
     def _go_back(self):
@@ -960,36 +1144,41 @@ class SettingsScreen(Screen):
         root.add_widget(make_topbar('Settings', back_cb=self._go_back))
 
         scroll = ScrollView()
-        content = GridLayout(cols=1, spacing=rdp(10), padding=rdp(12),
+        content = GridLayout(cols=1, spacing=rdp(12),
+                             padding=(rdp(12), rdp(10)),
                              size_hint_y=None)
         content.bind(minimum_height=content.setter('height'))
 
-        fc = VCard(size_hint_y=None, height=rdp(80))
+        # Folder card
+        fc = VCard()
         fc.add_widget(make_label('📁  Call Recordings Folder', size=13,
                                  bold=True, color=BRAND_DARK_HEX))
+        fc.add_widget(spacer(4))
         self._folder_lbl = make_label(state.folder_path or 'Not set',
                                       size=11, color=MUTED_HEX)
         fc.add_widget(self._folder_lbl)
         content.add_widget(fc)
 
-        content.add_widget(make_button('Change Folder',
-                                       bg_color=(0.53, 0.53, 0.93, 1),
-                                       height=rdp(44),
-                                       on_press=self._change_folder,
-                                       font_size=13))
+        content.add_widget(make_button(
+            'Change Folder', bg_color=BRAND_LIGHT, height=rdp(46),
+            on_press=self._change_folder, font_size=13))
 
-        content.add_widget(make_label('Danger Zone', size=13, bold=True,
+        content.add_widget(spacer(8))
+        content.add_widget(make_label('Danger Zone', size=12, bold=True,
                                       color=DANGER_HEX))
-        content.add_widget(make_button('🗑️  Clear All Data', bg_color=DANGER,
-                                       height=rdp(44),
-                                       on_press=self._confirm_clear,
-                                       font_size=13))
+        content.add_widget(make_button(
+            '🗑️  Clear All Data', bg_color=DANGER, height=rdp(46),
+            on_press=self._confirm_clear, font_size=13))
 
-        vc = VCard(size_hint_y=None, height=rdp(65))
-        vc.add_widget(make_label('Vocald v1.0', size=13, bold=True,
+        content.add_widget(spacer(8))
+
+        # About card
+        vc = VCard()
+        vc.add_widget(make_label('Vocald  v1.0', size=13, bold=True,
                                  color=BRAND_DARK_HEX))
+        vc.add_widget(spacer(4))
         vc.add_widget(make_label('100% on-device  •  No internet required',
-                                 size=10, color=MUTED_HEX))
+                                 size=11, color=MUTED_HEX))
         content.add_widget(vc)
 
         scroll.add_widget(content)
@@ -1011,21 +1200,24 @@ class SettingsScreen(Screen):
         box = BoxLayout(orientation='vertical', padding=rdp(16), spacing=rdp(12))
         box.add_widget(make_label(
             'This will delete ALL recordings, speakers,\n'
-            'and voice profiles. Cannot be undone.',
+            'and voice profiles. This cannot be undone.',
             size=12, color=DANGER_HEX))
-        row = BoxLayout(size_hint_y=None, height=rdp(44), spacing=rdp(8))
-        row.add_widget(make_button('Cancel', bg_color=MUTED, height=rdp(44),
-                                   font_size=13))
-        row.add_widget(make_button('DELETE ALL', bg_color=DANGER,
-                                   height=rdp(44), font_size=13))
+        box.add_widget(spacer(4))
+        row = BoxLayout(size_hint_y=None, height=rdp(46), spacing=rdp(10))
+        cancel_btn = make_button('Cancel', bg_color=MUTED, height=rdp(46),
+                                 font_size=13)
+        delete_btn = make_button('DELETE ALL', bg_color=DANGER,
+                                 height=rdp(46), font_size=13)
+        row.add_widget(cancel_btn)
+        row.add_widget(delete_btn)
         box.add_widget(row)
-        popup = Popup(title='⚠️ Confirm Delete', content=box,
-                      size_hint=(0.9, None), height=rdp(210))
-        row.children[1].bind(on_press=lambda _: popup.dismiss())
+        popup = Popup(title='⚠️  Confirm Delete', content=box,
+                      size_hint=(0.9, None), height=rdp(240))
+        cancel_btn.bind(on_press=lambda _: popup.dismiss())
         def _do_clear(*_):
             self._clear_all_data()
             popup.dismiss()
-        row.children[0].bind(on_press=_do_clear)
+        delete_btn.bind(on_press=_do_clear)
         popup.open()
 
     def _clear_all_data(self):
@@ -1074,7 +1266,8 @@ class VocaldApp(App):
         if self.store.exists('folder_path'):
             state.folder_path = self.store.get('folder_path')['value']
 
-        if self.store.exists('setup_done') and self.store.get('setup_done')['value']:
+        if (self.store.exists('setup_done')
+                and self.store.get('setup_done')['value']):
             self.sm.current = 'logs'
         else:
             self.sm.current = 'onboarding'
