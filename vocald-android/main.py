@@ -1,11 +1,12 @@
 """
-Vocald — Android APK  (UI v5)
+Vocald — Android APK  (UI v5 — Web Theme)
 Fixes:
   1. Pill badge overlap — use size_hint_x=None so it never shrinks into text
   2. Emoji rendering — replaced all emojis with plain ASCII/text so no broken boxes
   3. Speaker card overlap — removed GridLayout(cols=2) for detail rows,
      use a simple vertical stack with bold label + normal label per field
   4. URL-encoded filenames shown as-is (backend issue) but display truncated cleanly
+  5. Color theme updated to match web app (light blue-indigo palette)
 """
 
 import os, sys, threading
@@ -47,18 +48,29 @@ def F(n):   return sp(n) * _sc()
 def S(n):   return dp(n) * _sc()
 
 
-# ─── Colours ──────────────────────────────────────────────────────────────────
+# ─── Colours — Web App Theme (Light Blue-Indigo) ──────────────────────────────
+# Mapped from the React web app:
+#   bg gradient : #eff6ff → #e0e7ff  (blue-50 → indigo-100)
+#   surface     : #ffffff            (white cards)
+#   surf2       : #f0f9ff            (sky-50, lighter inputs/secondary cards)
+#   border      : #e5e7eb            (gray-200)
+#   primary     : #4f46e5            (indigo-600 — buttons, highlights)
+#   accent      : #312e81            (indigo-900 — headings, bold accents)
+#   warn        : #f59e0b            (amber-400)
+#   danger      : #ef4444            (red-500)
+#   text        : #1f2937            (gray-800)
+#   muted       : #6b7280            (gray-500)
 _C = {
-    'bg':      (.098, .106, .145, 1),
-    'surface': (.137, .149, .200, 1),
-    'surf2':   (.173, .188, .247, 1),
-    'border':  (.243, .259, .325, 1),
-    'primary': (.012, .804, .682, 1),
-    'accent':  (.608, .373, 1.000, 1),
-    'warn':    (1.000, .714, .157, 1),
-    'danger':  (1.000, .353, .380, 1),
-    'text':    (.929, .933, .949, 1),
-    'muted':   (.510, .533, .612, 1),
+    'bg':      (.937, .961, 1.000, 1),   # #eff6ff  blue-50
+    'surface': (1.000, 1.000, 1.000, 1), # #ffffff  white
+    'surf2':   (.941, .976, 1.000, 1),   # #f0f9ff  sky-50
+    'border':  (.898, .906, .922, 1),    # #e5e7eb  gray-200
+    'primary': (.310, .275, .898, 1),    # #4f46e5  indigo-600
+    'accent':  (.192, .180, .506, 1),    # #312e81  indigo-900
+    'warn':    (.961, .620, .043, 1),    # #f59e0b  amber-400
+    'danger':  (.937, .267, .267, 1),    # #ef4444  red-500
+    'text':    (.122, .161, .216, 1),    # #1f2937  gray-800
+    'muted':   (.420, .443, .502, 1),    # #6b7280  gray-500
 }
 def C(k):      return _C[k]
 def CA(k, a):  return _C[k][:3] + (a,)
@@ -161,7 +173,7 @@ def Divider():
 def PBtn(text, cb=None, h=50, fs=14, ck='primary', r=12):
     btn = Button(text=text, size_hint=(1, None), height=S(h),
                  font_size=F(fs), bold=True,
-                 background_color=(0,0,0,0), color=C('bg'))
+                 background_color=(0,0,0,0), color=(1,1,1,1))  # white text on coloured bg
     with btn.canvas.before:
         Color(*C(ck)); rr = RoundedRectangle(radius=[S(r)])
     btn.bind(pos=lambda i,v: setattr(rr,'pos',v),
@@ -172,9 +184,9 @@ def PBtn(text, cb=None, h=50, fs=14, ck='primary', r=12):
 def GBtn(text, cb=None, h=46, fs=13, r=12):
     btn = Button(text=text, size_hint=(1, None), height=S(h),
                  font_size=F(fs), bold=False,
-                 background_color=(0,0,0,0), color=C('text'))
+                 background_color=(0,0,0,0), color=C('text'))  # dark text on light bg
     with btn.canvas.before:
-        Color(*C('surf2')); rr = RoundedRectangle(radius=[S(r)])
+        Color(*C('border')); rr = RoundedRectangle(radius=[S(r)])
     btn.bind(pos=lambda i,v: setattr(rr,'pos',v),
              size=lambda i,v: setattr(rr,'size',v))
     if cb: btn.bind(on_press=cb)
@@ -182,7 +194,7 @@ def GBtn(text, cb=None, h=46, fs=13, r=12):
 
 def IBtn(icon, cb=None, sz=44, fs=20):
     btn = Button(text=icon, size_hint=(None,None), size=(S(sz),S(sz)),
-                 background_color=(0,0,0,0), color=C('text'), font_size=F(fs))
+                 background_color=(0,0,0,0), color=C('accent'), font_size=F(fs))
     if cb: btn.bind(on_press=cb)
     return btn
 
@@ -195,7 +207,7 @@ def TopBar(title, back_cb=None, extras=None):
     if back_cb:
         bar.add_widget(IBtn('<', cb=lambda _: back_cb(), sz=46, fs=18))
     lbl = Label(text=title, font_size=F(16), bold=True,
-                color=C('text'), halign='left', valign='middle')
+                color=C('accent'), halign='left', valign='middle')
     lbl.bind(size=lambda i, s: setattr(i, 'text_size', s))
     bar.add_widget(lbl)
     if extras:
@@ -225,7 +237,7 @@ def Toast(msg, d=2.5):
     fl.add_widget(lbl)
     p = Popup(title='', content=fl, size_hint=(.8,None), height=S(54),
               auto_dismiss=True, separator_height=0,
-              background_color=(*C('surf2')[:3],.97))
+              background_color=(*C('surface')[:3], .97))
     p.open()
     Clock.schedule_once(lambda _: p.dismiss(), d)
 
@@ -284,7 +296,7 @@ class OnboardingScreen(Scr):
     def _welcome(self):
         col = self._col()
         col.add_widget(Gap(32))
-        col.add_widget(WrapLbl('Vocald', fs=36, bold=True, halign='center'))
+        col.add_widget(WrapLbl('Vocald', fs=36, bold=True, halign='center', color='accent'))
         col.add_widget(WrapLbl('Speaker ID for call recordings',
                                fs=13, color='muted', halign='center'))
         col.add_widget(Gap(24))
@@ -500,10 +512,9 @@ class LogsScreen(Scr):
                         padding=[S(10), S(8)], spacing=S(8))
         _bg(act, C('surface'))
         self._sbtn = PBtn('SCAN',   cb=self._scan,   h=44, fs=13)
-        self._ubtn = PBtn('UPLOAD', cb=self._upload, h=44, fs=13, ck='surf2')
-        # give UPLOAD a ghost look
-        with self._ubtn.canvas.before:
-            Color(*C('surf2'))
+        self._ubtn = PBtn('UPLOAD', cb=self._upload, h=44, fs=13, ck='border')
+        # give UPLOAD a ghost look — override text color to be dark
+        self._ubtn.color = C('text')
         act.add_widget(self._sbtn)
         act.add_widget(self._ubtn)
         root.add_widget(act)
@@ -788,7 +799,7 @@ class DetailScreen(Scr):
             return
 
         meta = Card()
-        meta.add_widget(WrapLbl('Call Details', fs=14, bold=True, color='primary'))
+        meta.add_widget(WrapLbl('Call Details', fs=14, bold=True, color='accent'))
         meta.add_widget(Divider())
         meta.add_widget(Gap(4))
 
@@ -813,7 +824,7 @@ class DetailScreen(Scr):
         self._col.add_widget(meta)
         self._col.add_widget(Gap(4))
         self._col.add_widget(WrapLbl('Identified Speakers', fs=14,
-                                     bold=True, color='text'))
+                                     bold=True, color='accent'))
 
         spks = rec.get('speakers', [])
         if not spks:
@@ -917,7 +928,7 @@ class ProfilesScreen(Scr):
         sc.add_widget(WrapLbl(
             f'{stats["voice_profiles"]} voice profiles  |  '
             f'{stats["recordings"]} recordings',
-            fs=13, bold=True, color='primary'))
+            fs=13, bold=True, color='accent'))
         sc.add_widget(Gap(4))
         sc.add_widget(WrapLbl('Voice fingerprints stored locally on device.',
                               fs=10.5, color='muted'))
@@ -974,7 +985,7 @@ class SettingsScreen(Scr):
 
         fc = Card()
         fc.add_widget(WrapLbl('Recordings Folder', fs=12, bold=True,
-                              color='primary'))
+                              color='accent'))
         fc.add_widget(Gap(4))
         self._flbl = WrapLbl(ST.folder_path or 'Not set', fs=11, color='muted')
         fc.add_widget(self._flbl)
